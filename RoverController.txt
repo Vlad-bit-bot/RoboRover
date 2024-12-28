@@ -1,11 +1,9 @@
-#include <Arduino.h>
-
 /*
         AMRPI -- Developed by Danila Vlad in 2024
 
-        This is a 1 way (Master -> Slave) communication system designed for low latency, based on I2C. Its purpose is to use any External-Interrupt-capable
-        port on an Arduino MEGA 2560 board together with any other digital port to receive information from a Raspberry Pi in order to drive steppers/servos.
-        Its highlight is the low latency and efficiency.
+        This is a 1 way (Master -> Slave) communication system based on I2C. Its purpose is to use any External-Interrupt-capable
+        pin on an Arduino MEGA 2560 board together with any other digital pin in order to receive information from a Raspberry Pi
+        with which to drive steppers/servos. Its highlights are low latency and high efficiency.
 
         In this example:
 
@@ -14,13 +12,14 @@
 
 
  */
-
+#include <Arduino.h>
 
 #define SET_BIT(reg, bit, value) (value? reg|= (1<<bit) : reg&= ~(1<<bit))
 #define GET_BITS(reg, bits, pos) ((reg>>(pos-1))&((1<<bits)-1))
 #define SWITCH_BIT(reg, bit) (reg ^=(1<<bit))
 
 #define MULTIPLIER 200
+#define MinDelay 0
 
 //communication data
 
@@ -119,21 +118,17 @@ void ResetVariables(){
             11 -> reset all variables
 */
 void DataProcessing(uint8_t mode){
-    //Serial.print(GET_BITS(data, 1, 32));
 
-    //Serial.print(GET_BITS(data, 1, 31));
-
-    //Serial.print(GET_BITS(data, 1, 30));
-
+    Serial.println(data);
     if(mode == 0 ){
 
         if(GET_BITS(data,1,30) != Xdir){ dirX(); }    //Setting direction
         if(GET_BITS(data,1,20) != Xdir){ dirY(); }
         if(GET_BITS(data,1,10) != Xdir){ dirZ(); }
 
-        Xdelay = GET_BITS(data,4, 26) * MULTIPLIER;       //Setting delay
-        Ydelay = GET_BITS(data,4, 16) * MULTIPLIER;
-        Zdelay = GET_BITS(data,4, 6) * MULTIPLIER;
+        Xdelay = GET_BITS(data,4, 26) * MULTIPLIER + MinDelay;       //Setting delay
+        Ydelay = GET_BITS(data,4, 16) * MULTIPLIER+ MinDelay;
+        Zdelay = GET_BITS(data,4, 6) * MULTIPLIER+ MinDelay;
 
         Xsteps = GET_BITS(data,5, 21) * MULTIPLIER;       //Setting  steps
         Ysteps = GET_BITS(data,5, 11) * MULTIPLIER;
@@ -153,6 +148,7 @@ void DataProcessing(uint8_t mode){
     Serial.println(Xdelay);
     Serial.println(Ydelay);
     Serial.println(Zdelay);
+
     start = true;
 
 }
