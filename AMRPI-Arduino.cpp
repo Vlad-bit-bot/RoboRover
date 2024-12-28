@@ -118,7 +118,6 @@ void ResetVariables(){
             11 -> reset all variables
 */
 void DataProcessing(uint8_t mode){
-
     Serial.println(data);
     if(mode == 0 ){
 
@@ -127,8 +126,8 @@ void DataProcessing(uint8_t mode){
         if(GET_BITS(data,1,10) != Xdir){ dirZ(); }
 
         Xdelay = GET_BITS(data,4, 26) * MULTIPLIER + MinDelay;       //Setting delay
-        Ydelay = GET_BITS(data,4, 16) * MULTIPLIER+ MinDelay;
-        Zdelay = GET_BITS(data,4, 6) * MULTIPLIER+ MinDelay;
+        Ydelay = GET_BITS(data,4, 16) * MULTIPLIER + MinDelay;
+        Zdelay = GET_BITS(data,4, 6)  * MULTIPLIER  + MinDelay;
 
         Xsteps = GET_BITS(data,5, 21) * MULTIPLIER;       //Setting  steps
         Ysteps = GET_BITS(data,5, 11) * MULTIPLIER;
@@ -205,9 +204,8 @@ void loop() {
             Zsteps--;
         }
         if(Xsteps == 0 && Ysteps == 0 && Zsteps == 0){
-            Serial.println(Xsteps);
+            Serial.println("DONE");
             start = false;
         }
-        delayMicroseconds(10);
     }
 }
