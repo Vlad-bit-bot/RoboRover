@@ -58,5 +58,5 @@ def index():
 
 
 if __name__ == '__main__':
-	app.run(host = "192.168.100.103", port = 8080, threaded = True) 
+	app.run(host = "192.168.100.1", port = 8080, threaded = True) 
 							
