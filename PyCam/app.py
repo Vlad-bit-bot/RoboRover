@@ -23,7 +23,7 @@ class Buffer(io.BufferedIOBase):
 class Camera():
 	def __init__(self):
 		self.cam = Picamera2()
-		self.cam.configure(self.cam.create_preview_configuration(main={"size":(1920,1080)}))
+		self.cam.configure(self.cam.create_preview_configuration(main={"size":(1280,1080)}))
 		self.cam.start()
 		self.output = Buffer()
 		self.cam.start_recording(MJPEGEncoder(), FileOutput(self.output))
