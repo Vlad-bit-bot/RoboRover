@@ -9,11 +9,11 @@
 
         PIN 21 - SCL
         PIN 20 - SDA
-//Hello world
 
 
  */
 #include <Arduino.h>
+#include <Servo.h>
 
 #define SET_BIT(reg, bit, value) (value? reg|= (1<<bit) : reg&= ~(1<<bit))
 #define GET_BITS(reg, bits, pos) ((reg>>(pos-1))&((1<<bits)-1))
@@ -21,6 +21,10 @@
 
 #define MULTIPLIER 200
 #define MinDelay 0
+
+Servo servo1, servo2, servo3;
+
+
 
 //communication data
 
@@ -45,7 +49,7 @@
     bool Ydir = 1;
     bool Zdir = 1;
 
-    bool start = false;
+    int start = 0;
     bool runContinuously = false;
 
 void ResetVariables(){
@@ -56,12 +60,8 @@ void ResetVariables(){
     Xdelay = 0;
     Ydelay = 0;
     Zdelay = 0;
-
-    Xdir = 1;
-    Ydir = 1;
-    Zdir = 1;
-
-    runContinuously = false;
+   
+   runContinuously = false;
 }
 
 
@@ -104,7 +104,7 @@ void ResetVariables(){
         -> 32 BITS PACKAGES:
             -> first 2 bits(at pos 32 & 31 in 'data'): 00 -> STANDARD (Multiplier = 200)
                                                        01 -> CONTINUOUS (switch runContinuously)
-                                                       10 -> SERVO (WYP)
+                                                       10 -> SERVO (set position)
                                                        11 -> RESET (reset all variables to original values)
 
             00 -> 3 * 10 bits(10 bits per stepper): -> first bit -> direction ( 1 = normal, 0 = reversed)
@@ -112,19 +112,20 @@ void ResetVariables(){
                                                     -> 5 bits -> steps (certain stepper steps += steps * multiplier)
 
             01 -> 3 * 10 bits(10 bits per stepper): -> first bit -> direction ( 1 = normal, 0 = reversed)
-                                                    -> other bits = blank;
+                                                    -> other bits = 0;
 
-            10 -> WYP
+            10 -> 2 * 15 bits(15 bits per servo): -> first 8 bits -> position (0-180 degrees)
+                                                  -> other 7 bits = 0;
 
             11 -> reset all variables
 */
 void DataProcessing(uint8_t mode){
-    Serial.println(data);
+    //Serial.println(data);
     if(mode == 0 ){
 
         if(GET_BITS(data,1,30) != Xdir){ dirX(); }    //Setting direction
-        if(GET_BITS(data,1,20) != Xdir){ dirY(); }
-        if(GET_BITS(data,1,10) != Xdir){ dirZ(); }
+        if(GET_BITS(data,1,20) != Ydir){ dirY(); }
+        if(GET_BITS(data,1,10) != Zdir){ dirZ(); }
 
         Xdelay = GET_BITS(data,4, 26) * MULTIPLIER + MinDelay;       //Setting delay
         Ydelay = GET_BITS(data,4, 16) * MULTIPLIER + MinDelay;
@@ -134,22 +135,39 @@ void DataProcessing(uint8_t mode){
         Ysteps = GET_BITS(data,5, 11) * MULTIPLIER;
         Zsteps = GET_BITS(data,5, 1) * MULTIPLIER;
 
+        start = 1;
     }else if (mode == 1){
+        if(GET_BITS(data,1,30) != Xdir){ dirX(); }    //Setting direction
+        if(GET_BITS(data,1,20) != Ydir){ dirY(); }
+        if(GET_BITS(data,1,10) != Zdir){ dirZ(); }
+
+        Xdelay = GET_BITS(data,4, 26) * MULTIPLIER + MinDelay;       //Setting delay
+        Ydelay = GET_BITS(data,4, 16) * MULTIPLIER + MinDelay;
+        Zdelay = GET_BITS(data,4, 6)  * MULTIPLIER  + MinDelay;
+
         runContinuously = true;
+        start = 2;
     }
     else if(mode == 2){
-        //WYP
+      
+      servo1.write(GET_BITS(data, 8,21));
+      servo2.write(GET_BITS(data, 8, 11));
+      servo3.write(GET_BITS(data, 8, 1));
+      
+
     }else if(mode == 3){
+        runContinuously = false;
         ResetVariables();
     }
-    Serial.println(Xsteps);
+    data = 0;
+    /*Serial.println(Xsteps);
     Serial.println(Ysteps);
     Serial.println(Zsteps);
     Serial.println(Xdelay);
     Serial.println(Ydelay);
-    Serial.println(Zdelay);
+    Serial.println(Zdelay);*/
 
-    start = true;
+
 
 }
 
@@ -165,6 +183,14 @@ void Receive(){
 
 
 void setup() {
+  Serial.begin(9600);
+
+    servo1.attach(42);
+    servo2.attach(44);
+    servo3.attach(46);
+    
+ 
+
     SET_BIT(DDRE, PE4, 1); //X motor
     SET_BIT(DDRE, PE3, 1);
 
@@ -174,9 +200,8 @@ void setup() {
     SET_BIT(DDRG, PG5, 1); //Z motor
     SET_BIT(DDRH, PH4, 1);
 
-    Serial.begin(9600);
-
-    //communication
+    
+    
     SET_BIT(DDRD, PD1, 0);
 
     attachInterrupt(digitalPinToInterrupt(21), Receive,RISING);
@@ -184,10 +209,8 @@ void setup() {
     sei();
 
 }
-
-void loop() {
-    if(start) {
-        //Serial.println(Xsteps);
+void runPrecise(){
+    while(Xsteps != 0 || Ysteps != 0 || Zsteps != 0) {
         if (Xsteps > 0 && micros() - Xlast > Xdelay) {
 
             Xlast = micros();
@@ -204,9 +227,48 @@ void loop() {
             stepZ();
             Zsteps--;
         }
-        if(Xsteps == 0 && Ysteps == 0 && Zsteps == 0){
-            Serial.println("DONE");
-            start = false;
-        }
     }
+}
+void runUntilStopped(){
+   // Serial.print("MERGE!\n\n");
+    
+    if (Xdelay > 0 && micros() - Xlast > Xdelay) {
+
+            Xlast = micros();
+            stepX();
+           
+        }
+        if (Ydelay > 0 && micros() - Ylast > Ydelay) {
+            Ylast = micros();
+            stepY();
+            
+        }
+        if (Zdelay > 0 && micros() - Zlast > Zdelay) {
+            Zlast = micros();
+            stepZ();
+           
+        }
+}
+
+
+void loop() {
+
+    
+    if(start == 1) {
+        runPrecise();
+        start = 0;
+        ResetVariables();
+        Serial.print("DONE\n");
+    }
+    if(start == 2) {
+        if(runContinuously){
+          
+           runUntilStopped();
+        }else{
+          start = 0;
+          ResetVariables();
+        }
+        
+    }
+    
 }
