@@ -1,0 +1,4 @@
+-Rețeaua Neuronala EfficientNet, antrenată de Google, via TensorFlow
+-librării comune, precum Servo.h, PiCamera2, dar excluzând protocoalele de comunicare RaspberryPi-Arduino-Motoare (implementare proprie, a se vedea documentatia/prezentarea)
+-operarea cu HTTP via OkHTTP
+
