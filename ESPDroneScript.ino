@@ -1,7 +1,7 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include "esp_camera.h"
-#include "esp_http_server.h" // Necesar pentru serverul de camera
+#include "esp_http_server.h" 
 
 // ========== WIFI ==========
 const char* ssid = "RVR";
@@ -40,9 +40,6 @@ const char* password = "RoboRover2025!";
 WebServer server(80);
 static httpd_handle_t camera_httpd = NULL;
 
-// ========== ESC FUNCTIONS ==========
-// Am șters liniile 'extern' de aici, deoarece nu sunt necesare
-// și cauzează erori de "undefined reference" în fișierul principal .ino.
 
 void attachAllESCs() {
   ledcAttach(ESC1, PWM_FREQ, PWM_RES_BITS);
@@ -52,7 +49,7 @@ void attachAllESCs() {
 }
 
 void setAllESCs(int pulse_us) {
-  int duty = map(pulse_us, 1000, 2000, 3277, 6553); // Maparea pulsului la ciclul de lucru PWM
+  int duty = map(pulse_us, 1000, 2000, 3277, 6553); 
   ledcWrite(ESC1, duty);
   ledcWrite(ESC2, duty);
   ledcWrite(ESC3, duty);
@@ -70,9 +67,8 @@ static esp_err_t stream_handler(httpd_req_t *req) {
   esp_err_t res = ESP_OK;
   size_t _jpg_buf_len = 0;
   uint8_t * _jpg_buf = NULL;
-  char part_buf[128]; // Mărit bufferul pentru antet
+  char part_buf[128]; 
 
-  // Setează tipul de conținut pentru răspunsul multipart MJPEG
   res = httpd_resp_set_type(req, "multipart/x-mixed-replace;boundary=frame");
   if (res != ESP_OK) {
     Serial.printf("Failed to set HTTP response type: %d\n", res);
@@ -80,19 +76,17 @@ static esp_err_t stream_handler(httpd_req_t *req) {
   }
 
   while (true) {
-    fb = esp_camera_fb_get(); // Obține un frame de la camera
+    fb = esp_camera_fb_get(); 
     if (!fb) {
       Serial.println("Camera capture failed");
       res = ESP_FAIL;
-      // Nu continua cu următorul frame dacă a eșuat. Așteaptă și încearcă din nou.
-      vTaskDelay(100 / portTICK_PERIOD_MS); // Adaugă o mică întârziere pentru a nu bloca
+      vTaskDelay(100 / portTICK_PERIOD_MS); 
       continue;
     }
 
     _jpg_buf = fb->buf;
     _jpg_buf_len = fb->len;
 
-    // Construiește antetul pentru fiecare parte a streamului MJPEG
     int header_len = snprintf(part_buf, sizeof(part_buf),
                               "--frame\r\n"
                               "Content-Type: image/jpeg\r\n"
@@ -103,27 +97,26 @@ static esp_err_t stream_handler(httpd_req_t *req) {
       Serial.println("Failed to build MJPEG header or buffer too small");
       res = ESP_FAIL;
     } else {
-      // Trimite antetul
+      // antetul
       res = httpd_resp_send_chunk(req, part_buf, header_len);
     }
     
-    // Trimite datele JPEG
+    //  JPEG
     if (res == ESP_OK) {
       res = httpd_resp_send_chunk(req, (const char *)_jpg_buf, _jpg_buf_len);
     }
 
-    // Trimite separatorul de sfârșit de frame
     if (res == ESP_OK) {
       res = httpd_resp_send_chunk(req, "\r\n", 2);
     }
 
-    esp_camera_fb_return(fb); // Eliberează bufferul frame-ului
+    esp_camera_fb_return(fb); 
     if (res != ESP_OK) {
       Serial.printf("Error sending frame: %d\n", res);
-      break; // Ieși din buclă dacă a apărut o eroare la trimitere
+      break; 
     }
 
-    vTaskDelay(10 / portTICK_PERIOD_MS); // O mică întârziere pentru a evita blocarea sistemului
+    vTaskDelay(10 / portTICK_PERIOD_MS); 
   }
 
   return res;
@@ -131,8 +124,7 @@ static esp_err_t stream_handler(httpd_req_t *req) {
 
 void startCameraServer() {
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-  config.server_port = 8080; // Serverul de cameră rulează pe portul 8080
-
+  config.server_port = 8080; 
   if (httpd_start(&camera_httpd, &config) == ESP_OK) {
     httpd_uri_t uri_stream = {
       .uri       = "/stream",
@@ -193,23 +185,22 @@ void handleSet() {
     int val = server.arg("val").toInt();
     if (val >= 1000 && val <= 2000) {
       setAllESCs(val);
-      Serial.printf("Setting ESCs to: %d us\n", val); // Adaugă un mesaj de debug
+      Serial.printf("Setting ESCs to: %d us\n", val); 
     }
   }
-  server.send(204); // Răspuns fără conținut
+  server.send(204); 
 }
 
-// ========== SETUP & LOOP ==========
+// ========== SETUP si LOOP ==========
 void setup() {
-  Serial.begin(115200); // Pornire Serial Monitor pentru debugging
-  Serial.setTxBufferSize(2048); // Mărește bufferul de transmisie serială
+  Serial.begin(115200); 
+  Serial.setTxBufferSize(2048); 
 
   // ESC
   attachAllESCs();
   calibrateESCs();
   Serial.println("ESCs initialized and calibrated.");
 
-  // Camera config
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
@@ -232,14 +223,12 @@ void setup() {
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
   
-  // Modificare recomandată: Setează o rezoluție mai mică pentru testare inițială
-  config.frame_size = FRAMESIZE_QVGA; // 320x240 - O rezoluție bună pentru streaming stabil
-  // config.frame_size = FRAMESIZE_VGA; // Lasă asta comentat pentru a testa QVGA întâi
+  config.frame_size = FRAMESIZE_QVGA; 
 
-  config.jpeg_quality = 10; // Calitate JPEG (0-63, 0 = cea mai bună calitate)
-  config.fb_count = 2; // Număr de frame buffer-e
+  config.jpeg_quality = 10; 
+  config.fb_count = 2; 
 
-  // Init Camera
+  
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
     Serial.printf("Camera init failed with error 0x%x\n", err);
@@ -258,16 +247,13 @@ void setup() {
   Serial.println("");
   Serial.printf("WiFi connected, IP: %s\n", WiFi.localIP().toString().c_str());
 
-  // Servers
-  startCameraServer(); // Porneste serverul de camera pe portul 8080
-  server.on("/", handleRoot); // Handle for the main web page
-  server.on("/set", handleSet); // Handle for setting ESC values
-  server.begin(); // Start the main web server on port 80
+  startCameraServer(); 
+  server.on("/", handleRoot); 
+  server.on("/set", handleSet); 
+  server.begin(); 
   Serial.println("Web server started on port 80.");
 }
 
 void loop() {
-  server.handleClient(); // Procesează cererile clientului pentru serverul web
-  // Nu este nevoie de delay aici, deoarece handleClient() și vTaskDelay din stream_handler
-  // gestionează timpul de procesare.
+  server.handleClient(); 
 }
