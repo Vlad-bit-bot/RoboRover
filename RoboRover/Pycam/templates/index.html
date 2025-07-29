@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>MJPEG Stream with Joystick</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            background: black;
+        }
+
+        #video-stream {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+            z-index: 0;
+        }
+
+        #joystick-zone {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 150px;
+            height: 150px;
+            z-index: 1;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        #output {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            color: white;
+            font-family: monospace;
+            background: rgba(0,0,0,0.4);
+            padding: 8px 12px;
+            border-radius: 8px;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+
+<!-- MJPEG Stream -->
+<img id="video-stream" src="/video" alt="Video Stream" />
+
+<!-- Joystick Overlay -->
+<div id="joystick-zone"></div>
+<div id="output">Direction: N/A</div>
+
+<!-- Joystick Library -->
+<script src="../static/js/nipplejs.min.js"></script>
+<script>
+    const output = document.getElementById('output');
+
+    // Map nipplejs directions to single byte codes
+    const directionMap = {
+        up: 'F',
+        down: 'B',
+        left: 'L',
+        right: 'R'
+    };
+
+    const controlUrl = 'http://192.168.50.102:8000/post';
+
+    function sendDirectionByte(dirByte) {
+        fetch(controlUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain'
+            },
+            body: dirByte
+        }).catch(err => {
+            console.warn('Failed to send control data:', err);
+        });
+    }
+
+    const joystick = nipplejs.create({
+        zone: document.getElementById('joystick-zone'),
+        mode: 'static',
+        position: { left: '50%', top: '50%' },
+        color: 'white'
+    });
+
+    joystick.on('move', (evt, data) => {
+        if (data.direction && directionMap[data.direction.angle]) {
+            const dirByte = directionMap[data.direction.angle];
+            output.textContent = `Direction: ${data.direction.angle}`;
+            sendDirectionByte(dirByte);
+        }
+    });
+
+    joystick.on('end', () => {
+        output.textContent = 'Direction: N/A';
+        sendDirectionByte('0'); // Send '0' for stop/neutral
+    });
+</script>
+</body>
+</html>
+
